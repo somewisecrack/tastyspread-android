@@ -114,7 +114,11 @@ class StatsParityTest {
         assertEquals("debit", OptionStrategy.regime(20.0, 10.0).first)
         assertEquals(null, OptionStrategy.regime(80.0, 20.0).first)
         assertEquals(null, OptionStrategy.regime(50.0, 50.0).first)
-        assertEquals(null, OptionStrategy.regime(71.0, 70.0).first)
+        assertEquals(null, OptionStrategy.regime(61.0, 60.0).first)   // 60 is not > 60
+        assertEquals(null, OptionStrategy.regime(40.0, 39.0).first)   // 40 is not < 40
+        assertEquals("credit", OptionStrategy.regime(65.0, 62.0).first)
+        assertEquals("debit", OptionStrategy.regime(35.0, 39.0).first)
+        assertEquals(null, OptionStrategy.regime(45.0, 55.0).first)
         assertEquals(null, OptionStrategy.regime(null, 10.0).first)
         // Worked example: target 3.2 X shares per Y share, X spread = 30 sh, Y spread = 25 sh → 8:3
         val s = OptionStrategy.sizeToRatio(3.2, 30.0, 25.0, 100.0, 100.0, StrategySettings(pairBudget = 1100.0))!!

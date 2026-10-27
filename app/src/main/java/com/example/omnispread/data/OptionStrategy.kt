@@ -9,8 +9,8 @@ import kotlin.math.sqrt
 
 /** Tunables for the option rules (same defaults as the TastySpread desktop app). */
 data class StrategySettings(
-    val creditIvr: Double = 70.0,
-    val debitIvr: Double = 30.0,
+    val creditIvr: Double = 60.0,
+    val debitIvr: Double = 40.0,
     val horizonMultiple: Double = 1.5,
     val minDte: Int = 7,
     val maxDte: Int = 60,
@@ -24,7 +24,7 @@ data class StrategySettings(
 
 /**
  * Rules-based option spreads for a cointegrated pair:
- *  1. Regime (both legs must agree): both IVR > 70 → credit spreads; both IVR < 30 → debit
+ *  1. Regime (both legs must agree): both IVR > 60 → credit spreads; both IVR < 40 → debit
  *     spreads; anything else → no options.
  *  2. One expiry for both legs: the first date listed for both underlyings with
  *     DTE ≥ half-life × 1.5 (trading → calendar days), within [minDte, maxDte].

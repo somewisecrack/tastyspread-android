@@ -154,7 +154,7 @@ fun TickerStrip(symbol: String, insight: TickerInsight?) {
     }
 }
 
-/** Option rule chip: both IVR > 70 → credit, both < 30 → debit, otherwise none. Hidden when IVR is unknown. */
+/** Option rule chip: both IVR > 60 → credit, both < 40 → debit, otherwise none. Hidden when IVR is unknown. */
 @Composable
 fun RegimeTag(ix: TickerInsight?, iy: TickerInsight?) {
     val a = ix?.vol?.ivRank ?: return

@@ -15,7 +15,7 @@ TastySpread screens every pair in a universe for cointegration using the same **
 | **Universe** | The S&P 100 (101 tickers, 5,050 pairs), or one of its GICS sectors. Downloads and pair screening run in parallel. |
 | **News sentiment per ticker** | Google News headlines from the **last 24 hours** that name the company (curated names for every S&P 100 ticker), scored with an on-device finance lexicon and recency-weighted; each result shows the label, score and headline count. |
 | **tastytrade volatility** | IV index, IV rank and percentile, HV 30/60/90, **IV for every expiry**, next earnings date and industry (used for the same-industry flag). |
-| **Option spreads (rules-based)** | Both IVR > 70 → credit spreads, both < 30 → debit spreads, otherwise none; one expiry from the half-life; strikes from the expected move; contracts sized so net deltas are in the hedge ratio (±15 %). |
+| **Option spreads (rules-based)** | Both IVR > 60 → credit spreads, both < 40 → debit spreads, otherwise none; one expiry from the half-life; strikes from the expected move; contracts sized so net deltas are in the hedge ratio (±15 %). |
 | **Order flow** | Dry-run both legs (buying-power effect, fees, warnings), then place two Day limit orders at mid after an explicit confirmation. Sandbox or production. |
 | **Z-score chart & stock backtest** | As before. |
 
@@ -40,7 +40,7 @@ TickerVibe uses FinBERT; that model is ~440 MB, so the app uses a compact lexico
 
 | Step | Rule |
 |---|---|
-| Credit, debit or none | Both legs must agree: **both IVR > 70 → credit spreads**, **both IVR < 30 → debit spreads**, anything else → no options for the pair |
+| Credit, debit or none | Both legs must agree: **both IVR > 60 → credit spreads**, **both IVR < 40 → debit spreads**, anything else → no options for the pair |
 | Expiry | **One date for both legs**: the first expiry listed for both underlyings with DTE ≥ half-life × 1.5 (trading → calendar days), within 7–60 days |
 | Expected move | EM = spot × IV(that expiry) × √(DTE/365), per leg |
 | Credit strikes | Sell ~1.0 EM OTM, buy ~1.5 EM OTM (bull put on the long leg, bear call on the short leg) |
