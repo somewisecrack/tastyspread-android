@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.omnispread.data.OptionStrategy
 import com.example.omnispread.data.PairResult
 import com.example.omnispread.data.TickerInsight
 import com.example.omnispread.ui.theme.AccentBlue
@@ -112,6 +113,7 @@ fun ResultCard(
             ) {
                 if (result.extreme_z_in_hl == "Yes") MiniTag("Ext.Z", AccentRed)
                 if (result.same_sector == "Yes") MiniTag("Same Sector", AccentGreen)
+                RegimeTag(insightX, insightY)
                 Text(
                     if (isShortSpread) "▲ Short Spread" else "▼ Long Spread",
                     color      = if (isShortSpread) AccentRed else AccentGreen,
@@ -149,6 +151,18 @@ fun TickerStrip(symbol: String, insight: TickerInsight?) {
             val rv = insight.realizedVol21 ?: insight.vol.hv30
             if (rv != null) MiniTag("IV−RV ${String.format("%+.0f", iv - rv)}", TextSecondary)
         }
+    }
+}
+
+/** Option rule chip: both IVR > 70 → credit, both < 30 → debit, otherwise none. Hidden when IVR is unknown. */
+@Composable
+fun RegimeTag(ix: TickerInsight?, iy: TickerInsight?) {
+    val a = ix?.vol?.ivRank ?: return
+    val b = iy?.vol?.ivRank ?: return
+    when (OptionStrategy.regime(a, b).first) {
+        "credit" -> MiniTag("Opt: credit", AccentGreen)
+        "debit" -> MiniTag("Opt: debit", AccentCyan)
+        else -> MiniTag("Opt: none", TextMuted)
     }
 }
 

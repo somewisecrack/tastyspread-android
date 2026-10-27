@@ -196,15 +196,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ── options trade builder ───────────────────────────────────────────────
 
-    fun buildTrade(pair: PairResult, settings: StrategySettings = StrategySettings()) {
+    private val uiPrefs = application.getSharedPreferences("tastyspread_ui", android.content.Context.MODE_PRIVATE)
+    private val _budget = MutableStateFlow(uiPrefs.getFloat("pair_budget", 1000f).toDouble())
+    /** Max loss for both legs of a pair, $. */
+    val budget: StateFlow<Double> = _budget.asStateFlow()
+    private var lastTradePair: PairResult? = null
+
+    fun rebuildTrade(newBudget: Double) {
+        _budget.value = newBudget.coerceIn(100.0, 1_000_000.0)
+        uiPrefs.edit().putFloat("pair_budget", _budget.value.toFloat()).apply()
+        lastTradePair?.let { buildTrade(it) }
+    }
+
+    fun buildTrade(pair: PairResult) {
+        lastTradePair = pair
         val a = api() ?: run { _tradeState.value = TradeState.Error("Connect tastytrade in Settings first."); return }
         _tradeState.value = TradeState.Loading("Loading option chains for ${pair.x} and ${pair.y}...")
         viewModelScope.launch {
             _tradeState.value = try {
                 val plan = withContext(Dispatchers.IO) {
-                    // Realised-vol matching assumes daily closes; intraday scans fall back to tastytrade HV.
-                    val dailyCloses = if (_currentInterval.value == "1d") closes else emptyMap()
-                    OptionStrategy(a, settings).plan(pair, _insights.value, dailyCloses, _currentInterval.value)
+                    OptionStrategy(a, StrategySettings(pairBudget = _budget.value)).plan(pair, _insights.value, _currentInterval.value)
                 }
                 TradeState.Ready(plan)
             } catch (e: Exception) {
@@ -224,6 +235,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun sendOrders(live: Boolean) {
         val ready = _tradeState.value as? TradeState.Ready ?: return
         val a = api() ?: return
+        if (!ready.plan.tradeable) return
         // Live orders only after both legs passed a dry-run.
         if (live && (ready.checks.isEmpty() || ready.checks.any { !it.ok })) return
         val account = _config.value.accountNumber

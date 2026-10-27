@@ -114,8 +114,8 @@ data class SpreadProposal(
     val kind: SpreadKind,
     val expiry: String,
     val dte: Int,
-    val expiryIv: Double?,         // percent
-    val matchedRv: Double?,        // realised vol over a comparable window, percent
+    val expiryIv: Double,          // percent, IV of this expiry
+    val expectedMove: Double,      // spot × IV × √(DTE/365)
     val ivRank: Double?,
     val reason: String,
     val shortLeg: OptionLeg,
@@ -124,16 +124,25 @@ data class SpreadProposal(
     val netPrice: Double,          // per-share mid credit (+) or debit (−) of one spread
     val maxProfit: Double,         // dollars for all contracts
     val maxLoss: Double,           // dollars for all contracts
-    val deltaDollars: Double,      // net position delta × price × 100 × contracts
+    val netDelta: Double,          // per contract, Δlong − Δshort
+    val deltaDollars: Double,      // netDelta × spot × 100 × contracts
+    val earnings: String?,
     val earningsBeforeExpiry: Boolean,
 )
 
+/** "credit" | "debit" | null (no options). */
 data class PairTradePlan(
     val pair: String,
     val direction: String,
+    val regime: String?,
     val legX: SpreadProposal?,
     val legY: SpreadProposal?,
     val notes: List<String>,
+    val tradeable: Boolean,
+    val targetRatio: Double,
+    val achievedRatio: Double? = null,
+    val ratioError: Double? = null,
+    val budget: Double,
 )
 
 data class DryRunResult(

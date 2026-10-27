@@ -15,7 +15,7 @@ TastySpread screens every pair in a universe for cointegration using the same **
 | **Universe** | The S&P 100 (101 tickers, 5,050 pairs), or one of its GICS sectors. Downloads and pair screening run in parallel. |
 | **News sentiment per ticker** | Google News headlines from the **last 24 hours** that name the company (curated names for every S&P 100 ticker), scored with an on-device finance lexicon and recency-weighted; each result shows the label, score and headline count. |
 | **tastytrade volatility** | IV index, IV rank and percentile, HV 30/60/90, **IV for every expiry**, next earnings date and industry (used for the same-industry flag). |
-| **Option spreads per leg** | Long leg → bullish vertical, short leg → bearish vertical. Credit vs debit is chosen per leg from IV rank and that expiry's IV against realised vol over a matching window. |
+| **Option spreads (rules-based)** | Both IVR > 70 → credit spreads, both < 30 → debit spreads, otherwise none; one expiry from the half-life; strikes from the expected move; contracts sized so net deltas are in the hedge ratio (±15 %). |
 | **Order flow** | Dry-run both legs (buying-power effect, fees, warnings), then place two Day limit orders at mid after an explicit confirmation. Sandbox or production. |
 | **Z-score chart & stock backtest** | As before. |
 
@@ -37,15 +37,17 @@ For every ticker in a result: curated company name(s) → Google News RSS query 
 TickerVibe uses FinBERT; that model is ~440 MB, so the app uses a compact lexicon with negation handling instead. Treat the score as a rough news-tone flag.
 
 ### 3. Options plan
+
 | Step | Rule |
 |---|---|
-| Expiry | first expiry ≥ half-life × 1.5 (trading → calendar days), 7–60 DTE, preferring one that ends **before earnings** |
-| Credit vs debit | IVR ≥ 50 → credit; IVR < 25 → debit; otherwise credit if that expiry's IV > realised vol over the same horizon |
-| Credit strikes | OmniSpread `vol` rule: sell ~1 expected move OTM, choose the long strike (≤ 2.5 EM) with the best credit / max-loss |
-| Debit strikes | buy the strike nearest spot, sell ~1 expected move in the favourable direction |
-| Sizing | contract counts whose delta-dollar ratio is closest to the hedge (`qty·Px : Py`), within a $1,000 max-loss budget for the pair |
+| Credit, debit or none | Both legs must agree: **both IVR > 70 → credit spreads**, **both IVR < 30 → debit spreads**, anything else → no options for the pair |
+| Expiry | **One date for both legs**: the first expiry listed for both underlyings with DTE ≥ half-life × 1.5 (trading → calendar days), within 7–60 days |
+| Expected move | EM = spot × IV(that expiry) × √(DTE/365), per leg |
+| Credit strikes | Sell ~1.0 EM OTM, buy ~1.5 EM OTM (bull put on the long leg, bear call on the short leg) |
+| Debit strikes | Buy the strike nearest spot, sell ~1.0 EM in the favourable direction (bull call on the long leg, bear put on the short leg) |
+| Sizing | Contracts so that (nX × \|net ΔX\|) / (nY × \|net ΔY\|) = hedge qty (X shares per Y share); must be within ±15 % and the pair's max-loss budget (default $1,000, adjustable in the trade screen), otherwise no trade |
 
-Expected move = spot × IV(expiry) × √(DTE/365). Quotes and Greeks come from `GET /market-data/by-type`.
+Quotes and Greeks come from `GET /market-data/by-type`.
 
 ### 4. Orders
 Each leg is a separate 2-leg limit order (`POST /accounts/{acct}/orders/dry-run`, then `/orders`) with a unique `external-identifier`. The legs are **not** linked, so one can fill without the other. The **Place orders** button is enabled only after both legs pass a dry-run.

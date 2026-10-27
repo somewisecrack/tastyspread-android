@@ -107,4 +107,18 @@ class StatsParityTest {
         assertTrue(NewsSentiment.mentions("AT&T plans to retire its landline network", NEWS_NAMES.getValue("T").split("|")))
         assertTrue(NewsSentiment.mentions("Google Maps adds gas prices", NEWS_NAMES.getValue("GOOGL").split("|")))
     }
+
+    @Test
+    fun optionRegimeAndSizing() {
+        assertEquals("credit", OptionStrategy.regime(80.0, 75.0).first)
+        assertEquals("debit", OptionStrategy.regime(20.0, 10.0).first)
+        assertEquals(null, OptionStrategy.regime(80.0, 20.0).first)
+        assertEquals(null, OptionStrategy.regime(50.0, 50.0).first)
+        assertEquals(null, OptionStrategy.regime(71.0, 70.0).first)
+        assertEquals(null, OptionStrategy.regime(null, 10.0).first)
+        // Worked example: target 3.2 X shares per Y share, X spread = 30 sh, Y spread = 25 sh → 8:3
+        val s = OptionStrategy.sizeToRatio(3.2, 30.0, 25.0, 100.0, 100.0, StrategySettings(pairBudget = 1100.0))!!
+        assertEquals(8, s.nX); assertEquals(3, s.nY); assertEquals(0.0, s.error, 1e-12)
+        assertEquals(null, OptionStrategy.sizeToRatio(1.0, 30.0, 25.0, 600.0, 600.0, StrategySettings(pairBudget = 1000.0)))
+    }
 }

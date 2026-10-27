@@ -23,6 +23,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -63,7 +68,9 @@ import com.example.omnispread.viewmodel.TradeState
 fun TradeScreen(viewModel: MainViewModel, onBack: () -> Unit) {
     val state by viewModel.tradeState.collectAsState()
     val config by viewModel.config.collectAsState()
+    val budget by viewModel.budget.collectAsState()
     var confirm by remember { mutableStateOf(false) }
+    var budgetText by remember(budget) { mutableStateOf(budget.toInt().toString()) }
 
     Scaffold(
         topBar = {
@@ -81,6 +88,25 @@ fun TradeScreen(viewModel: MainViewModel, onBack: () -> Unit) {
             Modifier.padding(padding).padding(horizontal = 16.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // Budget: max loss for both legs together; more budget → more contracts → closer hedge ratio.
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Pair max-loss budget $", color = TextSecondary, fontSize = 13.sp)
+                OutlinedTextField(
+                    value = budgetText,
+                    onValueChange = { budgetText = it.filter { c -> c.isDigit() }.take(7) },
+                    singleLine = true,
+                    modifier = Modifier.width(110.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
+                        focusedBorderColor = AccentBlue, unfocusedBorderColor = Border),
+                )
+                OutlinedButton(
+                    onClick = { budgetText.toDoubleOrNull()?.let { viewModel.rebuildTrade(it) } },
+                    enabled = state !is TradeState.Loading,
+                    border = BorderStroke(1.dp, AccentBlue),
+                ) { Text("Rebuild", color = AccentCyan) }
+            }
+
             when (val s = state) {
                 is TradeState.Loading -> Row(verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(Modifier.size(16.dp), color = AccentBlue, strokeWidth = 2.dp)
@@ -97,6 +123,25 @@ fun TradeScreen(viewModel: MainViewModel, onBack: () -> Unit) {
                             " • ${if (config.sandbox) "SANDBOX" else "PRODUCTION"} • account ${config.accountNumber.ifBlank { "not set" }}",
                         color = if (config.sandbox) AccentCyan else AccentYellow, fontSize = 12.sp,
                     )
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        when (plan.regime) {
+                            "credit" -> MiniTag("Credit spreads", AccentGreen)
+                            "debit" -> MiniTag("Debit spreads", AccentCyan)
+                            else -> MiniTag("No options", TextMuted)
+                        }
+                        if (plan.regime != null) MiniTag(if (plan.tradeable) "Meets rules" else "Doesn't meet rules", if (plan.tradeable) AccentGreen else AccentRed)
+                    }
+                    plan.achievedRatio?.let { r ->
+                        val err = plan.ratioError ?: 0.0
+                        Surface(color = BgCard, border = BorderStroke(1.dp, if (plan.tradeable) Border else AccentRed), shape = MaterialTheme.shapes.small) {
+                            Text(
+                                "Hedge ratio (X shares per Y share): target ${"%.3f".format(plan.targetRatio)} • options give ${"%.3f".format(r)} " +
+                                    "(${"%+.1f".format(err * 100)}%, limit ±15%)",
+                                color = if (kotlin.math.abs(err) <= 0.15) AccentGreen else AccentRed, fontSize = 12.sp,
+                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            )
+                        }
+                    }
                     listOfNotNull(plan.legX, plan.legY).forEach { LegCard(it) }
                     if (plan.notes.isNotEmpty()) {
                         Surface(color = BgCard, border = BorderStroke(1.dp, Border), shape = MaterialTheme.shapes.small) {
@@ -109,14 +154,14 @@ fun TradeScreen(viewModel: MainViewModel, onBack: () -> Unit) {
                     if (s.checks.isNotEmpty()) ResultsBox("Dry-run", s.checks)
                     if (s.submitted.isNotEmpty()) ResultsBox("Submitted", s.submitted)
 
-                    val bothLegs = plan.legX != null && plan.legY != null
+                    val bothLegs = plan.tradeable && plan.legX != null && plan.legY != null
                     val dryOk = s.checks.isNotEmpty() && s.checks.all { it.ok }
                     if (s.busy != null) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             CircularProgressIndicator(Modifier.size(16.dp), color = AccentBlue, strokeWidth = 2.dp)
                             Spacer(Modifier.width(8.dp)); Text(s.busy, color = TextSecondary, fontSize = 13.sp)
                         }
-                    } else if (s.submitted.isEmpty()) {
+                    } else if (s.submitted.isEmpty() && bothLegs) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                             OutlinedButton(
                                 onClick = { viewModel.dryRunTrade() }, enabled = bothLegs,
@@ -177,7 +222,7 @@ private fun LegCard(p: SpreadProposal) {
                 Spacer(Modifier.width(6.dp))
                 MiniTag(if (p.bullish) "bullish" else "bearish", if (p.bullish) AccentGreen else AccentRed)
             }
-            Text("${p.expiry} (${p.dte}d) • spot ${String.format("%.2f", p.spot)} • ${p.contracts} contract${if (p.contracts > 1) "s" else ""}",
+            Text("${p.expiry} (${p.dte}d) • spot ${String.format("%.2f", p.spot)} • IV ${String.format("%.1f", p.expiryIv)}% • EM ±${String.format("%.2f", p.expectedMove)} • ${p.contracts} contract${if (p.contracts > 1) "s" else ""}",
                 color = TextSecondary, fontSize = 12.sp)
             Text(p.reason, color = TextMuted, fontSize = 11.sp)
             HorizontalDivider(color = Border.copy(alpha = 0.5f))
@@ -185,10 +230,11 @@ private fun LegCard(p: SpreadProposal) {
             HorizontalDivider(color = Border.copy(alpha = 0.5f))
             Text(
                 "${if (p.kind.isCredit) "Credit" else "Debit"} ${String.format("%.2f", kotlin.math.abs(p.netPrice))} • " +
-                    "max profit ${money(p.maxProfit)} • max loss ${money(p.maxLoss)} • Δ$ ${String.format("%+,.0f", p.deltaDollars)}",
+                    "net Δ ${String.format("%+.3f", p.netDelta)} (${String.format("%.1f", kotlin.math.abs(p.netDelta) * 100)} sh/contract, " +
+                    "${String.format("%.0f", kotlin.math.abs(p.netDelta) * 100 * p.contracts)} sh total) • max profit ${money(p.maxProfit)} • max loss ${money(p.maxLoss)}",
                 color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
             )
-            if (p.earningsBeforeExpiry) Text("Earnings before expiry", color = AccentYellow, fontSize = 11.sp)
+            if (p.earningsBeforeExpiry) Text("Earnings ${p.earnings} before expiry", color = AccentYellow, fontSize = 11.sp)
         }
     }
 }

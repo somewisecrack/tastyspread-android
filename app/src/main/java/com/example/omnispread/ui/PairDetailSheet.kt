@@ -180,6 +180,11 @@ fun PairDetailSheet(
             // Volatility + sentiment per leg
             listOf(pair.x to insightX, pair.y to insightY).forEach { (sym, ins) -> InsightCard(sym, ins) }
 
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                RegimeTag(insightX, insightY)
+                Text("Rule: both IVR > 70 → credit, both < 30 → debit, otherwise no options.", color = TextMuted, fontSize = 11.sp)
+            }
+
             // Options trade (tastytrade)
             Button(
                 onClick  = onBuildTrade,

@@ -26,8 +26,12 @@ class TastytradeLiveTest {
         val vols = api.marketMetrics(listOf(x, y))
         vols.values.forEach { println("${it.symbol}: IV ${it.ivIndex} IVR ${it.ivRank} HV30 ${it.hv30} earnings ${it.nextEarnings} industry ${it.industry} expiries ${it.expiries.size}") }
 
-        val pair = PairResult(pair = "$x/$y", x = x, y = y, qty = 1.1, direction = "SHORT_SPREAD", half_life = 12, z_score = 2.4)
-        val plan = OptionStrategy(api).plan(pair, vols.mapValues { TickerInsight(it.key, vol = it.value) }, emptyMap(), "1d")
+        val qty = System.getenv("OMNISPREAD_QTY")?.toDouble() ?: 1.1
+        val dir = System.getenv("OMNISPREAD_DIR") ?: "SHORT_SPREAD"
+        val budget = System.getenv("OMNISPREAD_BUDGET")?.toDouble() ?: 1000.0
+        val pair = PairResult(pair = "$x/$y", x = x, y = y, qty = qty, direction = dir, half_life = 12, z_score = 2.4)
+        val plan = OptionStrategy(api, StrategySettings(pairBudget = budget)).plan(pair, vols.mapValues { TickerInsight(it.key, vol = it.value) }, "1h")
+        println("regime=${plan.regime} tradeable=${plan.tradeable} ratio=${plan.achievedRatio} err=${plan.ratioError}")
         listOfNotNull(plan.legX, plan.legY).forEach { p ->
             println("${p.underlying} ${p.kind.label} ${p.expiry} (${p.dte}d) spot ${"%.2f".format(p.spot)} x${p.contracts}: " +
                 "${p.shortLeg.action} ${p.shortLeg.strike}${p.shortLeg.type} ${p.shortLeg.bid}/${p.shortLeg.ask} Δ${p.shortLeg.delta} | " +
@@ -38,7 +42,7 @@ class TastytradeLiveTest {
         plan.notes.forEach { println("note: $it") }
 
         val account = api.accountNumbers().firstOrNull()
-        if (account != null) listOfNotNull(plan.legX, plan.legY).forEach { p ->
+        if (account != null && plan.tradeable) listOfNotNull(plan.legX, plan.legY).forEach { p ->
             val r = api.dryRun(account, api.verticalOrder(p, kotlin.math.abs(p.netPrice), "omnispread-test"), p.underlying)
             println("dry-run ${p.underlying}: ok=${r.ok} bp=${r.buyingPowerEffect} fees=${r.fees} errors=${r.errors} warnings=${r.warnings}")
         }
