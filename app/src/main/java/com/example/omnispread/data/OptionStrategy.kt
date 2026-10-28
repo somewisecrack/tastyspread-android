@@ -13,7 +13,7 @@ data class StrategySettings(
     val debitIvr: Double = 40.0,
     val horizonMultiple: Double = 1.5,
     val minDte: Int = 7,
-    val maxDte: Int = 60,
+    val maxDte: Int = 180,
     val creditShortEm: Double = 1.0,
     val creditLongEm: Double = 1.5,
     val debitShortEm: Double = 1.0,
@@ -27,7 +27,7 @@ data class StrategySettings(
  *  1. Regime (both legs must agree): both IVR > 60 → credit spreads; both IVR < 40 → debit
  *     spreads; anything else → no options.
  *  2. One expiry for both legs: the first date listed for both underlyings with
- *     DTE ≥ half-life × 1.5 (trading → calendar days), within [minDte, maxDte].
+ *     DTE ≥ max(half-life × 1.5 (trading → calendar days), minDte), up to maxDte.
  *  3. Strikes from each leg's expected move EM = spot × IV(expiry) × √(DTE/365):
  *     credit: sell ~1.0 EM OTM, buy ~1.5 EM OTM; debit: buy nearest spot, sell ~1.0 EM.
  *     The long leg of the pair gets a bullish spread, the short leg a bearish one.
@@ -94,12 +94,13 @@ class OptionStrategy(
 
         // One expiry for both legs
         val hlDays = halfLifeDays(pair.half_life, interval)
-        val target = ceil(hlDays * s.horizonMultiple * 365.0 / 252.0).toInt().coerceIn(s.minDte, s.maxDte)
+        val target = max(ceil(hlDays * s.horizonMultiple * 365.0 / 252.0).toInt(), s.minDte)
         val ex = api.nestedChain(pair.x).associateBy { it.date }
         val ey = api.nestedChain(pair.y).associateBy { it.date }
         val date = ex.keys.intersect(ey.keys).sorted().firstOrNull { ex.getValue(it).dte in target..s.maxDte }
         if (date == null) {
-            notes += "No expiry listed for both ${pair.x} and ${pair.y} between $target and ${s.maxDte} days."
+            notes += if (target <= s.maxDte) "No expiry listed for both ${pair.x} and ${pair.y} at ≥ $target days (searched up to ${s.maxDte})."
+                     else "Half-life needs ≥ $target days to expiry, beyond the ${s.maxDte}-day limit."
             return result(mode)
         }
         notes += "Half-life ≈ ${"%.1f".format(hlDays)} trading days → target ≥ $target days → expiry $date (${ex.getValue(date).dte}d)."

@@ -41,7 +41,7 @@ TickerVibe uses FinBERT; that model is ~440 MB, so the app uses a compact lexico
 | Step | Rule |
 |---|---|
 | Credit, debit or none | Both legs must agree: **both IVR > 60 → credit spreads**, **both IVR < 40 → debit spreads**, anything else → no options for the pair |
-| Expiry | **One date for both legs**: the first expiry listed for both underlyings with DTE ≥ half-life × 1.5 (trading → calendar days), within 7–60 days |
+| Expiry | **One date for both legs**: the first expiry listed for both underlyings with DTE ≥ half-life × 1.5 (trading → calendar days), at least 7 and at most 180 days |
 | Expected move | EM = spot × IV(that expiry) × √(DTE/365), per leg |
 | Credit strikes | Sell ~1.0 EM OTM, buy ~1.5 EM OTM (bull put on the long leg, bear call on the short leg) |
 | Debit strikes | Buy the strike nearest spot, sell ~1.0 EM in the favourable direction (bull call on the long leg, bear put on the short leg) |
