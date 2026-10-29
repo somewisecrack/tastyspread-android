@@ -215,6 +215,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _tradeState.value = try {
                 val plan = withContext(Dispatchers.IO) {
+                    // Scan may have run before tastytrade was connected — fetch the two legs now.
+                    val missing = listOf(pair.x, pair.y).filter { _insights.value[it]?.vol == null }
+                    if (missing.isNotEmpty()) runCatching { a.marketMetrics(missing) }.getOrNull()?.let { vols ->
+                        _insights.update { m ->
+                            m + vols.mapValues { (k, v) -> (m[k] ?: TickerInsight(k)).copy(vol = v) }
+                        }
+                    }
                     OptionStrategy(a, StrategySettings(pairBudget = _budget.value)).plan(pair, _insights.value, _currentInterval.value)
                 }
                 TradeState.Ready(plan)
